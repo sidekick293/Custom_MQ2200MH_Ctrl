@@ -1,6 +1,6 @@
 # HA Custom Component for MQ2200MH Ctrl
 
-Home Assistant custom component for controlling Solar Battery MQ-2200-M-H (aka Solakon One aka Avocado Orbit M aka Avocado 22 Pro) by Fox ESS via ModbusTCP.
+Home Assistant custom component for controlling Solar Battery MQ2200-M-H (aka Solakon One aka Avocado Orbit-M aka Avocado 22 Pro) via ModbusTCP.
 
 ## Installation
 
@@ -17,12 +17,25 @@ Alongside the control, the component exposes sensors for PV power, AC power, bat
 
 ## Things to be aware of
 
-**The setpoint is not always honoured.** Two hardware limits override whatever you write:
+**The setpoint is not always honoured.** Two hardware limits override whatever you write.
 
-* **Battery full (100%):** the inverter starts feeding in whatever PV is providing. Do not be surprised to see more export than you asked for — there is nowhere left to put the incoming PV power.
-* **Battery at 10%:** discharge stops. The battery cannot be drained below that, so any setpoint you send is ignored until it charges back up.
+When the battery is full (100%), the inverter might start feeding in more than initially was set. Do not be surprised to see more export than you asked for, because there is nowhere left to put the incoming PV power.
 
-Keep this in mind when building automations on top of the control entity — treat the value you set as a request, not a guarantee, and read back the actual power sensors if you need to know what is really happening.
+When the battery is at 10%, discharge should stop. The battery cannot be drained below that, so any setpoint you send is ignored until it charges back up.
+
+Keep this in mind when building automations on top of the control entity. Treat the value you set as a request, not a guarantee, and read back the actual power sensors if you need to know what is really happening.
+
+## Bogus readings and filtering
+
+The MQ2200MH occasionally returns nonsense over Modbus. A single garbage reading can decode to something absurd, for example a battery charge of -23 GWh in one 15-second cycle. Left unchecked, one such spike can wreck a monthly energy statistic or make an automation misfire, so the component filters readings before reporting them.
+
+The power sensors (PV, AC, battery power) use hard sanity bounds. A reading outside the configured range is discarded and the last good value is kept for that cycle.
+
+SOC and the energy counters use a small FIFO buffer. Each cycle's reading goes into the buffer, and the reported value is derived from the readings that agree with each other, dropping any lone outlier. This needs no fixed thresholds, because the tolerance adapts to how big the sensor's own steps are.
+
+The trade-off is a short warm-up delay after the component (re)starts. Until the FIFO buffer has filled, the sensor reports the value restored from Home Assistant's database rather than a raw, unfiltered reading. With the default settings this is about 75 seconds. Slightly delayed values are a better deal than a broken long-term statistic from a single spike.
+
+All of this is tunable in `const.py`. You can adjust the power bounds (`POWER_BOUNDS`), the buffer length (`FIFO_LEN`), the number of readings that must agree (`FIFO_GROUP`), and which sensors are filtered (`FILTERED_SENSORS`). If a sensor still lets a spike through or reacts too slowly for your taste, change those values.
 
 ## Inner Workings
 
@@ -32,14 +45,7 @@ I limited the output to 800W.
 
 Communication is plain socket code, no pymodbus or any other dependency.
 
-Feel free to fork and improve.
-
-## Disclaimer
-
-I am not responsible if your house burns down.
-Code is provided as is without warranty of any kind.
-Code is heavily vibe-coded.
-I only tested on an Avocado Orbit M (the other devices should work identically).
+Feel free to fork and change.
 
 ## License
 

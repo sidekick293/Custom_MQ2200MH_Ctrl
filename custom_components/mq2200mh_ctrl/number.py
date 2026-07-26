@@ -39,7 +39,7 @@ class MQ2200MHPowerControl(NumberEntity):
         self._attr_device_info = DeviceInfo(
             identifiers={(DOMAIN, entry.entry_id)},
             name=f"MQ2200MH ({entry.data[CONF_HOST]})",
-            manufacturer="Fox ESS",
+            manufacturer="",
             model="MQ2200MH",
         )
 

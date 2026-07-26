@@ -8,7 +8,7 @@ from homeassistant.const import CONF_HOST, CONF_PORT, Platform
 from homeassistant.core import HomeAssistant
 from homeassistant.helpers.update_coordinator import DataUpdateCoordinator
 
-from .const import DOMAIN
+from .const import DOMAIN, POWER_BOUNDS
 from .modbus import read_registers, combine_i32, combine_u32
 
 _LOGGER = logging.getLogger(__name__)
@@ -56,6 +56,23 @@ async def async_unload_entry(hass: HomeAssistant, entry: ConfigEntry):
     return unload_ok
 
 
+def _in_bounds(key, value):
+    """Return True if value is within the configured bounds for this sensor.
+
+    Sensors without configured bounds always pass.
+    """
+    bounds = POWER_BOUNDS.get(key)
+    if bounds is None:
+        return True
+    lo, hi = bounds
+    if value < lo or value > hi:
+        _LOGGER.warning(
+            "%s reading %s out of bounds [%s, %s] - discarding", key, value, lo, hi
+        )
+        return False
+    return True
+
+
 def _read_all(host, port, device_id):
     """Read all sensor values (blocking, runs in executor thread)."""
     data = {}
@@ -63,17 +80,23 @@ def _read_all(host, port, device_id):
     # PV power (39118, 2 registers, i32, W)
     regs = read_registers(host, port, 39118, 2, device_id)
     if regs and len(regs) >= 2:
-        data["total_pv_power"] = combine_i32(regs[0], regs[1])
+        value = combine_i32(regs[0], regs[1])
+        if _in_bounds("total_pv_power", value):
+            data["total_pv_power"] = value
 
     # AC active power (39134, 2 registers, i32, W)
     regs = read_registers(host, port, 39134, 2, device_id)
     if regs and len(regs) >= 2:
-        data["active_power"] = combine_i32(regs[0], regs[1])
+        value = combine_i32(regs[0], regs[1])
+        if _in_bounds("active_power", value):
+            data["active_power"] = value
 
     # Battery power (39230, 2 registers, i32, W)
     regs = read_registers(host, port, 39230, 2, device_id)
     if regs and len(regs) >= 2:
-        data["battery_power"] = combine_i32(regs[0], regs[1])
+        value = combine_i32(regs[0], regs[1])
+        if _in_bounds("battery_power", value):
+            data["battery_power"] = value
 
     # Battery SOC (39424, 1 register, i16, %)
     regs = read_registers(host, port, 39424, 1, device_id)
