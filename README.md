@@ -47,6 +47,14 @@ Communication is plain socket code, no pymodbus or any other dependency.
 
 Feel free to fork and change.
 
+## Disclaimer
+
+Check your local regulation how much feed in power is legal.
+I am not responsible if your house burns down.
+Code is provided as is without warranty of any kind.
+Code is heavily vibe-coded.
+I only tested on an Avocado Orbit M (the other devices should work identically).
+
 ## License
 
 MIT
